@@ -5,15 +5,18 @@ import { setLoggedIn } from '../state/actions/loggedInActions';
 import { jwtDecode } from 'jwt-decode';
 import './styles/Home.css';
 import { setUserId } from '../state/actions/userIdActions';
-import { setChats } from '../state/actions/chatActions'; // Import the new action
+import { fetchChats, setChats } from '../state/actions/chatActions'; // Import the new action
 import CreateChatForm from './chatForm';
 
 const Home = () => {
-  const dispatch = useDispatch();
-  const loggedIn = useSelector((state) => state.auth.loggedIn);
   const [showMenu, setShowMenu] = useState(false);
-  const chats = useSelector((state) => state.chat.chats); // Access chats from Redux store
+
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const loggedIn = useSelector((state) => state.auth.loggedIn);
+  const chats = useSelector((state) => state.chat.chats); // Access chats from Redux store
+  const userId = useSelector((state) => state.userId.userId)
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -24,12 +27,36 @@ const Home = () => {
 
       // Fetch chats only if userId is available
       if (decodedToken.user_id !== null && decodedToken.user_id !== undefined) {
-        fetchChats(decodedToken.user_id);
+        dispatch(setUserId(decodedToken.user_id));
+        fetchChatsFun();
       }
     } else {
       dispatch(setLoggedIn(false));
     }
   }, [dispatch]);
+
+  useEffect(() => {
+    const socket = new WebSocket(`ws://localhost:8080/WebChat-1.0-SNAPSHOT/messageSocket/${userId}`); // Adjust the URL based on your backend server
+
+    socket.onopen = () => {
+        console.log('WebSocket connection opened');
+    };
+
+    socket.onmessage = (event) => {
+        if(event.data === 'Chats_Updated'){
+          console.log('Received message on chats updating!');
+            fetchChatsFun();
+        }
+    };
+
+    socket.onclose = () => {
+        console.log('WebSocket connection closed');
+    };
+
+    return () => {
+        socket.close();
+    };
+}, []);
 
   const logOut = () => {
     localStorage.removeItem('token');
@@ -40,22 +67,9 @@ const Home = () => {
     setShowMenu(!showMenu);
   };
 
-  const fetchChats = async (userId) => {
-    try {
-      if (userId !== undefined && userId !== null) {
-        const response = await fetch(`http://desktop-2mkb6m2:8080/WebChat-1.0-SNAPSHOT/api/data-provider/get-chats-by-user-id?userId=${userId}`);
-        if (response.ok) {
-          const data = await response.json();
-          dispatch(setChats(data)); // Update Redux store with chats
-        } else {
-          console.error('Failed to fetch chats');
-        }
-      } else {
-        console.log('userId is undefined or null');
-      }
-    } catch (error) {
-      console.error('Error fetching chats', error);
-    }
+  const fetchChatsFun = async () => {
+    dispatch(fetchChats(userId));
+
   };
 
   const handleChatClick = (chatRoomId) => {
@@ -66,11 +80,13 @@ const Home = () => {
     <div className="container">
       {loggedIn ? (
         <div>
-          <h1>Welcome to Chat App!</h1>
-          <p>Please create a chat or enter an existing conversation.</p>
-          <button onClick={logOut}>Log Out</button>
+          <h1>Добро пожаловать в чат-мессенджер</h1>
+          <p>Создайте новый чат или войдите в существующий</p>
+          <button className="logout-button" onClick={logOut}>
+            Выйти
+          </button>
           <div className={`android-menu ${showMenu ? 'show' : ''}`}>
-            <p>Your Chats</p>
+            <p>Ваши чаты:</p>
             <ul>
               {chats.map((chat) => (
                 <li key={chat.chatRoomId} onClick={() => handleChatClick(chat.chatRoomId)}>
@@ -78,20 +94,24 @@ const Home = () => {
                 </li>
               ))}
             </ul>
-            <button onClick={toggleMenu}>Закрыть чаты</button>
+            <button className="close-button" onClick={toggleMenu}>
+              Закрыть чаты
+            </button>
           </div>
-          <button onClick={toggleMenu}>Открыть чаты</button>
-          <CreateChatForm /> {/* Add the new component here */}
+          <button className="open-button" onClick={toggleMenu}>
+            Открыть чаты
+          </button>
+          <CreateChatForm />
         </div>
       ) : (
         <div>
-          <h1>Welcome to Chat App!</h1>
-          <p>Please login or register to start a conversation.</p>
-          <Link to="/login" className="button">
-            Log In
+          <h1>Добро пожаловать в чат-мессенджер</h1>
+          <p>Войдите или зарегистрируйтесь, чтобы начать общаться</p>
+          <Link to="/login" className="auth-button login-button">
+            Войти
           </Link>
-          <Link to="/register" className="button">
-            Register
+          <Link to="/register" className="auth-button register-button">
+            Зарегистрироваться
           </Link>
         </div>
       )}

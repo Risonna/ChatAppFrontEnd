@@ -1,36 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { setLoggedIn } from '../state/actions/loggedInActions';
 import { setUserId } from '../state/actions/userIdActions';
 import './styles/CreateChatForm.css'; // Import your CSS file
+import { createChat } from '../state/actions/chatActions';
+import { fetchAllUsers } from '../state/actions/allUsersActions';
 
 const CreateChatForm = () => {
   const dispatch = useDispatch();
 
   const [chatRoomName, setChatRoomName] = useState('');
   const [selectedUsers, setSelectedUsers] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
+  const allUsers = useSelector((state) => state.allUsers.allUsers) || [];
+
   const [searchTerm, setSearchTerm] = useState('');
+
+  const userId = useSelector((state) => state.userId.userId);
 
   useEffect(() => {
     // Fetch all users when the component mounts
-    fetchAllUsers();
+    dispatch(fetchAllUsers());
+    console.log(allUsers);
   }, []);
 
-  const fetchAllUsers = async () => {
-    try {
-      const response = await fetch('http://desktop-2mkb6m2:8080/WebChat-1.0-SNAPSHOT/api/data-provider/get-all-users');
-
-      if (response.ok) {
-        const data = await response.json();
-        setAllUsers(data);
-      } else {
-        console.error('Failed to fetch all users');
-      }
-    } catch (error) {
-      console.error('Error fetching all users', error);
-    }
-  };
 
   const handleUserSelect = (userId) => {
     setSelectedUsers((prevSelected) => {
@@ -41,32 +33,8 @@ const CreateChatForm = () => {
       }
     });
   };
-  const createChat = async () => {
-    try {
-      // Split user IDs into an array of integers
-      console.log(selectedUsers);
-      const userIdsArray = selectedUsers;
-
-      // Create an array of objects with the same roomname and different userIds
-      const chatData = userIdsArray.map(userId => 
-        ({ chatRoomName: chatRoomName, userId }));
-
-      const response = await fetch('http://desktop-2mkb6m2:8080/WebChat-1.0-SNAPSHOT/api/data-provider/create-chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(chatData),
-      });
-
-      if (response.ok) {
-        // If the chat is created successfully, you might want to redirect to the home page or the newly created chat
-      } else {
-        console.error('Failed to create chat');
-      }
-    } catch (error) {
-      console.error('Error creating chat', error);
-    }
+  const createChatFun = async () => {
+    dispatch(createChat(chatRoomName, selectedUsers, userId));
   };
 
   const filteredUsers = allUsers.filter((user) =>
@@ -75,26 +43,28 @@ const CreateChatForm = () => {
 
   return (
     <div className="create-chat-form">
-      <h1>Create a New Chat</h1>
+      <h1>Создайте новый чат</h1>
       <label>
-        Chat Room Name:
-        <input type="text" value={chatRoomName} onChange={(e) => setChatRoomName(e.target.value)} />
+        Введите название чата:
+        <input type="text" value={chatRoomName} onChange={(e) => setChatRoomName(e.target.value)}
+        placeholder="Название чата" />
       </label>
       <label>
-        Search Users:
+        Найти пользователей:
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by username"
+          placeholder="Найти по имени пользователя"
         />
       </label>
       <label>
-        Select Users:
+        Выберите пользователей:
         <div className="user-list">
           <div className="user-list-scroll">
-            {filteredUsers.map((user) => (
-              <div key={user.userId} className="user-item">
+            {filteredUsers.map((user) => {
+              if(user.userId !== userId){
+              return <div key={user.userId} className="user-item">
                 <input
                   type="checkbox"
                   id={`user-${user.userId}`}
@@ -103,11 +73,15 @@ const CreateChatForm = () => {
                 />
                 <label htmlFor={`user-${user.userId}`}>{user.username}</label>
               </div>
-            ))}
+              }
+              else{
+                return "";
+              }
+            })}
           </div>
         </div>
       </label>
-      <button onClick={createChat}>Create Chat</button>
+      <button onClick={createChatFun}>Создать чат</button>
     </div>
   );
 };
